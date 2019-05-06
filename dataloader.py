@@ -89,11 +89,11 @@ def data_sampler(window_size, _csv_name, data_save):
         return export_data
 
 
-csv_name = "data.csv"
+csv_name = "../si_data.csv"
 window = 4
 
-# data_to_load = data_sampler(window, csv_name, data_save=True)
-# labels = data_sampler(window, csv_name, data_save=False)
+data_to_load = data_sampler(window, csv_name, data_save=True)
+labels = data_sampler(window, csv_name, data_save=False)
 tt = torch.load('labels.pt')
 
 print(tt[:, 4000:4500])
