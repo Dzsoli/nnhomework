@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
-
+import pickle
 
 class VehicleDataset(Dataset):
     """NGSIM vehicle dataset"""
@@ -74,7 +74,7 @@ class VehicleData:
         # [0, frame_id] or [-1, frame_id] or [1, frame_id]
         self.change_lane = None
         # mean, variance, changes or not?, frame id
-        self.mean_var_label_frame = None
+        self.labels = None
 
     def set_change_lane(self, l_change):
         self.change_lane = l_change
@@ -92,7 +92,16 @@ class VehicleData:
         l_change = torch.tensor(np.array(l_change))
         self.set_change_lane(l_change)
 
+    def do_labeling(self):
+        labels = []
 
+
+def save_object(obj, filename):
+    with open(filename, 'wb') as output:  # Overwrites any existing file.
+        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+
+def dataloader(vehicle_objects):
+    #TODO ... itt elakadtunk... -.-
 """
 def data_sampler(window_size, _csv_name, data_save):
     if data_save:
