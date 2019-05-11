@@ -9,14 +9,15 @@ from torch.utils.data import Dataset, DataLoader
 class VehicleDataset(Dataset):
     """NGSIM vehicle dataset"""
 
-    def __init__(self, csv_file, root_dir, transform=None):
-        # TODO: megmagyarázni a változó neveket és argumentumokat (angolul
+    def __init__(self, csv_file, root_dir=None, transform=None):
+        # TODO: megmagyarázni a változó neveket és argumentumokat
         """
         asd
         """
-        self.all_data = pd.read_csv(csv_file)
+        self.all_data = torch.tensor(np.array(pd.read_csv(csv_file, delimiter=',', header=None)))
         self.root_dir = root_dir
         self.transform = transform
+        self.vehicle_objects = None
 
     def __len__(self):
         """returns with all the number of frames of the dataset"""
@@ -25,6 +26,20 @@ class VehicleDataset(Dataset):
     def __getitem__(self, idx):
         """returns the idx_th vehicle"""
         return VehicleData()
+
+    def create_objects(self):
+        i = 0
+        vehicle_objects = []
+        while len(self.all_data) > i:
+            total_frames = int(self.all_data[i][2])
+            until = i + total_frames
+            data = self.all_data[i:until]
+            vehicle = VehicleData(data)
+            vehicle.lane_changing()
+            #TODO: labeling számítás
+            vehicle_objects.append(vehicle)
+            i = until
+        self.vehicle_objects = vehicle_objects
 
 
 class VehicleData:
@@ -59,8 +74,26 @@ class VehicleData:
         # [0, frame_id] or [-1, frame_id] or [1, frame_id]
         self.change_lane = None
         # mean, variance, changes or not?, frame id
+        self.mean_var_label_frame = None
+
+    def set_change_lane(self, l_change):
+        self.change_lane = l_change
+
+    def lane_changing(self):
+        l_change = []
+        total_frames = self.size
+
+        for i in range(int(total_frames) - 1):
+            if (self.lane_id[i + 1] - self.lane_id[i]) != 0:
+                l_change.append([self.lane_id[i + 1] - self.lane_id[i],
+                                 self.frames[i + 1]])
+            else:
+                l_change.append([0, self.frames[i + 1]])
+        l_change = torch.tensor(np.array(l_change))
+        self.set_change_lane(l_change)
 
 
+"""
 def data_sampler(window_size, _csv_name, data_save):
     if data_save:
         with open(_csv_name) as f:
@@ -154,4 +187,4 @@ labels = data_sampler(window, csv_name, data_save=False)
 tt = torch.load('labels.pt')
 
 print(tt[:, 4000:4500])
-
+"""

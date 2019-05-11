@@ -16,12 +16,18 @@ import warnings
 warnings.filterwarnings("ignore")
 # si_data = pd.read_csv('../si_data.csv')
 
-csv_name = "../si_data.csv"
-window = 4
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-data_to_load = data_sampler(window, csv_name, data_save=True)
-labels = data_sampler(window, csv_name, data_save=False)
-tt = torch.load('labels.pt')
+csv_name = "../si_data.csv"
+# window = 4
+#
+# data_to_load = data_sampler(window, csv_name, data_save=True)
+# labels = data_sampler(window, csv_name, data_save=False)
+# tt = torch.load('labels.pt')
+
+dataset = VehicleDataset(csv_name)
+dataset.create_objects()
+print(dataset.vehicle_objects[0])
 
 
 class RNN(nn.Module):
