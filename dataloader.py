@@ -21,11 +21,11 @@ class VehicleDataset(Dataset):
 
     def __len__(self):
         """returns with all the number of frames of the dataset"""
-        return len(self.all_data)
+        return len(self.vehicle_objects)
 
     def __getitem__(self, idx):
         """returns the idx_th vehicle"""
-        return VehicleData()
+        return self.vehicle_objects[idx]
 
     def create_objects(self):
         i = 0
@@ -100,8 +100,20 @@ def save_object(obj, filename):
     with open(filename, 'wb') as output:  # Overwrites any existing file.
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
-def dataloader(vehicle_objects):
+
+def dataloader(Dataset, window_size=30):
     #TODO ... itt elakadtunk... -.-
+    data = []
+    labels = []
+    for i in range(len(Dataset)):
+        frames = Dataset[i].size - window_size
+        #for j in range(frames):
+
+
+    #return data, labels
+
+
+
 """
 def data_sampler(window_size, _csv_name, data_save):
     if data_save:
