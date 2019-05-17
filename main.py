@@ -25,61 +25,51 @@ csv_name = "../si_data.csv"
 
 dataset = VehicleDataset(csv_name)
 dataset.create_objects()
-#print(dataset[1].x[1])
-#data, labels = dataloader(dataset, 10)
 
-insize = 1
-hisize = 10
-ousize = 1
+
+
+# insize = 1
+# hisize = 10
+# ousize = 1
 lr = 0.005
 num_epochs = 10
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# Model instance
-model = LSTM(input_dim=insize, hidden_dim=hisize, output_dim=ousize)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+data, labels = dataloader(dataset.vehicle_objects, 30, 5)
+data = torch.from_numpy(data).float()
+labels = torch.LongTensor(labels)
+model = SimpleLSTM()
+model = model.to(device)
+# loss = nn.CrossEntropyLoss()
+# loss = nn.MultiLabelSoftMarginLoss()
+# loss = nn.NLLLoss()
+loss = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=lr)
 
-hist = np.zeros(num_epochs)
+for epoch in range(num_epochs):
+    model.train()
+    for i in range(87):
+        print(i)
+        input_batch = data[i].to(device)
+        input_label = labels[i].to(device=device, dtype=torch.float)
+        out = model(input_batch)
+        # print(out)
+        # print(input_label)
+        err = loss(out, input_label)
+        optimizer.zero_grad()
+        err.backward()
+        optimizer.step()
 
-print(dataset[1].size)
-
-for t in range(num_epochs):
-    for i in range(dataset.__len__()):
-        for k in range(dataset[i].size-1):
-            print('dataset: {}, size: {}'.format(i, dataset[i].size))
-            a = dataset[i].a[k]
-            v = dataset[i].v[k]
-            dx = dataset[i].x[k+1]-dataset[i].x[k]
-
-            X_train = autograd.Variable(torch.tensor([dx, v, a]))
-
-            if dataset[i].lane_id[k] != dataset[i].lane_id[k+1]:
-                y_train = torch.tensor([dataset[i].lane_id[k+1]-dataset[i].lane_id[k]])
-            else:
-                y_train = torch.tensor([0])
-
-            model.zero_grad()
-            model.hidden = model.init_hidden()
-
-            y_pred = model(X_train)
-            print(y_pred)
-            loss = criterion(y_pred, y_train)
-            if t % 100 == 0:
-                print("Epoch ", t, "MSE: ", loss.item())
-            hist[t] = loss.item()
-
-            # Zero out gradient, else they will accumulate between epochs
-            optimizer.zero_grad()
-
-            # Backward pass
-            loss.backward()
-
-            # Update parameters
-            optimizer.step()
+        print('epoch: {}, loss: {}'.format(epoch, err))
 
 
-print('game over')
+
+
+# print(len(data))
+# print(len(labels))
+# print(data[0])
+# print(labels[0])
+# print(data.shape)
 
 
