@@ -39,8 +39,25 @@ class RNN(nn.Module):
         return outputs, hidden
 
     def init_hidden(self):
-        #TODO gauss init
+        # TODO gauss init
         return torch.zeros(1, self.hidden_size)
+
+
+class SimpleLSTM(nn.Module):
+    def __init__(self):
+        super(SimpleLSTM, self).__init__()
+
+        self.rnn = nn.LSTM(
+            input_size=3,
+            hidden_size=3,
+            num_layers=1,
+            batch_first=True,
+        )
+
+    def forward(self, x):
+
+        out, (h_n, h_c) = self.rnn(x, None)
+        return out[:, -1, :]  # Return output at last time-step
 
 
 class LSTM(nn.Module):
@@ -54,7 +71,7 @@ class LSTM(nn.Module):
         self.num_layers = num_layers
 
         # Define the LSTM layer
-        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers)
+        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim)
 
         # Define the output layer
         self.linear = nn.Linear(self.hidden_dim, output_dim)
@@ -73,6 +90,5 @@ class LSTM(nn.Module):
 
         # Only take the output from the final timetep
         # Can pass on the entirety of lstm_out to the next layer if it is a seq2seq prediction
-        y_pred = self.linear(lstm_out[-1].view(self.batch_size, -1))
+        y_pred = lstm_out[-1].view(self.batch_size, -1)
         return y_pred.view(-1)
-
