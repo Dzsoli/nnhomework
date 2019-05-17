@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import pickle
 
+##
+# TODO: sávváltások: 5, 5, 7, 12, 13, 21, 31, 32, 41, 41, 44, 45...
+##
+
 class VehicleDataset(Dataset):
     """NGSIM vehicle dataset"""
 
@@ -14,7 +18,7 @@ class VehicleDataset(Dataset):
         """
         asd
         """
-        self.all_data = torch.tensor(np.array(pd.read_csv(csv_file, delimiter=',', header=None)))
+        self.all_data = np.array(pd.read_csv(csv_file, delimiter=',', header=None))
         self.root_dir = root_dir
         self.transform = transform
         self.vehicle_objects = None
@@ -25,7 +29,8 @@ class VehicleDataset(Dataset):
 
     def __getitem__(self, idx):
         """returns the idx_th vehicle"""
-        return VehicleData()
+        t = self.vehicle_objects[idx]
+        return t
 
     def create_objects(self):
         i = 0
@@ -35,7 +40,7 @@ class VehicleDataset(Dataset):
             until = i + total_frames
             data = self.all_data[i:until]
             vehicle = VehicleData(data)
-            vehicle.lane_changing()
+            #vehicle.lane_changing()
             #TODO: labeling számítás
             vehicle_objects.append(vehicle)
             i = until
@@ -55,6 +60,7 @@ class VehicleData:
         self.t = data[:, 3]
         # lateral x coordinate
         self.x = data[:, 4]
+        self.x = data_normalize(self.x)
         # Longitudinal y coordinate
         self.y = data[:, 5]
         # Dimensions of the car: Length, Width
@@ -63,8 +69,10 @@ class VehicleData:
         self.type = int(data[0, 10])
         # Instantenous velocity
         self.v = data[:, 11]
+        self.v = data_normalize(self.v)
         # Instantenous acceleration
         self.a = data[:, 12]
+        self.a = data_normalize(self.a)
         # lane ID: 1 is the FARTHEST LEFT. 5 is the FARTHEST RIGHT.
         # 6 is Auxiliary lane for off and on ramp
         # 7 is on ramp
@@ -78,12 +86,12 @@ class VehicleData:
 
     def set_change_lane(self, l_change):
         self.change_lane = l_change
-
+"""
     def lane_changing(self):
         l_change = []
         total_frames = self.size
 
-        for i in range(int(total_frames) - 1):
+        for i in range(int(total_frames) + 1):
             if (self.lane_id[i + 1] - self.lane_id[i]) != 0:
                 l_change.append([self.lane_id[i + 1] - self.lane_id[i],
                                  self.frames[i + 1]])
@@ -93,107 +101,123 @@ class VehicleData:
         self.set_change_lane(l_change)
 
     def do_labeling(self):
-        labels = []
+        labels = []"""
+
+
+def data_normalize(data):
+    avg = np.mean(data)
+    std = np.std(data)
+
+    norm_data = (data - avg) / std
+
+    return norm_data
 
 
 def save_object(obj, filename):
     with open(filename, 'wb') as output:  # Overwrites any existing file.
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
-def dataloader(vehicle_objects):
-    #TODO ... itt elakadtunk... -.-
-"""
-def data_sampler(window_size, _csv_name, data_save):
-    if data_save:
-        with open(_csv_name) as f:
-            read_csv = csv.reader(f, delimiter=',')
-            header = next(read_csv)
-            data = []
 
-            for rows in read_csv:
-                v_id = rows[0]
-                frame = rows[1]
-                x = rows[4]
-                y = rows[5]
-                v = rows[11]
-                a = rows[12]
-                line = rows[13]
-                lane_change = rows[18]
+def dataloader(vehicle_objects, window_size, shift):
+    # print("dataset length: {}".format(vehicle_objects.__len__()))
+    num_of_parameters = 3
+    tensor_idx = 0
+    total_size = 572
 
-                data.append(
-                    [int(v_id), int(frame), float(x), float(y), float(v), float(a), int(line), int(lane_change)])
+    lane_change_tensor = np.zeros((total_size, num_of_parameters, window_size))
+    lane_keeping_tensor = np.zeros((total_size, num_of_parameters, window_size))
+    lab = np.zeros((2 * total_size, 3))
+    t = np.zeros((num_of_parameters, window_size))
+    tt = np.zeros((num_of_parameters, window_size))
 
-        data_np = np.array(data)
-        data = torch.tensor(data_np)
-        DataNames = header
+    # print(lane_change_tensor.shape)
+    # print(lane_keeping_tensor.shape)
+    # print(t.shape)
+    # print(tt.shape)
 
-        new_data = torch.zeros((data.size(0), window_size, data.size(1)))
-        print("new data size: {}".format(new_data.size()))
-        print("original data size: {} x {}".format(data.size(0), data.size(1)))
-        # print(type(data))
-        # print(data[8000])
-        same_flag = True
-        i = 0
-        j = 0
-        while data.size(0) - 10 > i:
-            for k in range(window_size):
-                if data[i + k, 0] != data[i + k + 1, 0]:
-                    same_flag = False
-                    break
+    for vehicle in vehicle_objects:
+        # print("Vehicle: {}, size: {}".format(vehicle.id, vehicle.size))
+        lane_change_idx, label = lane_change_to_idx(vehicle)
 
-            if same_flag:
-                for t in range(window_size):
-                    for z in range(data.size(1)):
-                        # new_data[j, t, z].add(data[t+i, z])
-                        new_data[j, t, z] = data[t + i, z]
-                        # print("{} {}  {}: {}".format(j, t, z, new_data[j, t, z]))
-                        # print(data[t+i, z])
-                j = j + 1
-            else:
-                i = i
-                # print("autó váltáska")
-            # print(new_data[j])
-            i = i + 1
-            same_flag = True
-            # print("{}. ciklus".format(i))
-        torch.save(new_data, 'new_data.pt')
-        print("Tensor saved!")
-        export_data = new_data
+        if (lane_change_idx - 1) > 2 * window_size:
+            t[0] = vehicle.x[lane_change_idx - window_size + 1: lane_change_idx + 1]
+            t[1] = vehicle.v[lane_change_idx - window_size + 1: lane_change_idx + 1]
+            t[2] = vehicle.a[lane_change_idx - window_size + 1: lane_change_idx + 1]
 
-        return export_data
+            tt[0] = vehicle.x[lane_change_idx - 2 * window_size + 1: lane_change_idx - 1 * window_size + 1]
+            tt[1] = vehicle.v[lane_change_idx - 2 * window_size + 1: lane_change_idx - 1 * window_size + 1]
+            tt[2] = vehicle.a[lane_change_idx - 2 * window_size + 1: lane_change_idx - 1 * window_size + 1]
 
-    else:
-        new_data = torch.load('new_data.pt')
-        print("Data has been generated, now i create the labels...")
+            lane_change_tensor[tensor_idx] = t
+            lane_keeping_tensor[tensor_idx] = tt
 
-        _sample = []
-        _label = []
-        print(new_data.size())
-        for k in range(new_data.size(0)):
-            sav = 0
-            for l in range(new_data.size(1)):
-                if new_data[k, l, 7] == 1:  # egyik savvaltas
-                    sav = 1
-                elif new_data[k, l, 7] == -1:  # masik savvaltas
-                    sav = 2
-                else:
-                    sav = sav
-            _label.append(sav)
-            _sample.append(k)
+        if label == -1:
+            lab[2 * tensor_idx] = [1, 0, 0]
+        elif label == 1:
+            lab[2 * tensor_idx] = [0, 0, 1]
 
-        export_data = np.array([_sample, _label])
-        torch.save(export_data, 'labels.pt')
-        print("Labels has been created!")
+        lab[2 * tensor_idx + 1] = [0, 1, 0]
 
-        return export_data
+        if lane_change_idx != 0:
+            tensor_idx = tensor_idx + 1
+
+    # print(tensor_idx)
+    # print(lane_change_tensor[50])
+    # print(lane_keeping_tensor[50])
+
+    data_tensor = np.concatenate((lane_keeping_tensor, lane_change_tensor))
+    labels_tensor = lab
+
+    # print(data_tensor.shape)
+    # print(labels_tensor.shape)
+
+    # print(labels_tensor[0:600])
+
+    return data_tensor, labels_tensor
 
 
-csv_name = "../si_data.csv"
-window = 4
+def lane_change_to_idx(vehicle):
+    j = 0
+    labels = 0
+    lane_change_idx = 0
 
-data_to_load = data_sampler(window, csv_name, data_save=True)
-labels = data_sampler(window, csv_name, data_save=False)
-tt = torch.load('labels.pt')
+    while (j < vehicle.size - 1) & (lane_change_idx == 0):
+        delta = vehicle.lane_id[j + 1] - vehicle.lane_id[j]
+        if delta != 0:
+            lane_change_idx = j
+            labels = delta
+            # print("Lane change idx: {}".format(lane_change_idx))
+        j = j + 1
 
-print(tt[:, 4000:4500])
-"""
+    return lane_change_idx, labels
+
+
+def testing(model, d_loader):
+    print('Testing the network...')
+    model.eval()
+    model.to('cuda')
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inp, labs in d_loader:
+            inp, labs = inp.to('cuda'), labs.to('cuda')
+            outputs = model(inp)
+            _, prediction = torch.max(outputs.data, 1)
+            total += labs.size(0)
+
+            out_idx = torch.argmax(outputs, 1)
+            lab_idx = torch.argmax(labs, 1)
+
+            print(outputs)
+            print(labs)
+            # print(out_idx)
+            # print(lab_idx)
+            for k in range(len(out_idx)):
+                total = total + 1
+                if out_idx[k] == lab_idx[k]:
+                    correct = correct + 1
+
+        print('Accuracy on the test set: %d %%' % (100 * correct / total))
+
+

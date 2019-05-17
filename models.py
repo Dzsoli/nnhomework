@@ -218,3 +218,155 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
             plot_loss_total = 0
 
     showPlot(plot_losses)
+
+"""
+class CNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output):
+        super(CNN, self).__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(input_size, 32, kernel_size=5, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=5, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
+        self.drop_out = nn.Dropout()
+        self.fc1 = nn.Linear(7 * 7 * 64, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output)
+
+    def forward(self, x):
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = out.reshape(out.size(0), -1)
+        out = self.drop_out(out)
+        out = self.fc1(out)
+        out = self.fc2(out)
+        return out
+"""
+
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels=3, out_channels=8, kernel_size=3, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),  # size after pooling?
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv1d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv1d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=2),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+        )
+
+        self.fc1 = nn.Linear(192, 80)  # output 3 classes: ...
+        self.fc2 = nn.Linear(80, 3)
+        self.soft = nn.Softmax()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        output = self.fc1(x.view(x.size()[0], -1))
+        output = self.fc2(output)
+        output = self.soft(output)
+        return output
+
+
+class DilatedNet(nn.Module):
+    def __init__(self, num_securities=5, hidden_size=64, dilation=2, t=10):
+        """:param num_securities: int, number of stocks
+        :param hidden_size: int, size of hidden layers
+        :param dilation: int, dilation value
+        :param T: int, number of look back points"""
+
+        super(DilatedNet, self).__init__()
+        self.dilation = dilation
+        self.hidden_size = hidden_size
+        # First Layer
+        self.dilated_conv1 = nn.Conv1d(num_securities, hidden_size, kernel_size=2, dilation=self.dilation)
+        self.relu1 = nn.ReLU()
+        # Layer 2
+        self.dilated_conv2 = nn.Conv1d(hidden_size, hidden_size, kernel_size=1, dilation=self.dilation)
+        self.relu2 = nn.ReLU()
+        # Layer 3
+        self.dilated_conv3 = nn.Conv1d(hidden_size, hidden_size, kernel_size=1, dilation=self.dilation)
+        self.relu3 = nn.ReLU()
+        # Layer 4
+        self.dilated_conv4 = nn.Conv1d(hidden_size, hidden_size, kernel_size=1, dilation=self.dilation)
+        self.relu4 = nn.ReLU()
+        # Output layer
+        self.conv_final = nn.Conv1d(hidden_size, num_securities, kernel_size=1)
+        self.t = t
+
+    def forward(self, x):
+        """ :param x: Pytorch Variable, batch_size x n_stocks x T
+            :return:"""
+        # First layer
+        out = self.dilated_conv1(x)
+        out = self.relu1(out)
+        # Layer 2:
+        out = self.dilated_conv2(out)
+        out = self.relu2(out)
+        # Layer 3:
+        out = self.dilated_conv3(out)
+        out = self.relu3(out)
+        # Layer 4:
+        out = self.dilated_conv4(out)
+        out = self.relu4(out)
+        # Final layer
+        out = self.conv_final(out)
+        out = out[:, :, -1]
+        return out
+
+
+class DilatedNet2D(nn.Module):
+    def __init__(self, hidden_size=64, dilation=1, t=10):
+        """:param hidden_size: int, size of hidden layers
+        :param dilation: int, dilation value
+        :param T: int, number of look back points"""
+        super(DilatedNet2D, self).__init__()
+        self.dilation = dilation
+        self.hidden_size = hidden_size
+        # First Layer
+        self.dilated_conv1 = nn.Conv2d(1, hidden_size, kernel_size=(1, 2), dilation=(1, self.dilation))
+        self.relu1 = nn.ReLU()
+        # Layer 2
+        self.dilated_conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=(1, 2), dilation=(1, self.dilation))
+        self.relu2 = nn.ReLU()
+        # Layer 3
+        self.dilated_conv3 = nn.Conv2d(hidden_size, hidden_size, kernel_size=(1, 2), dilation=(1, self.dilation))
+        self.relu3 = nn.ReLU()
+        # Layer 4
+        self.dilated_conv4 = nn.Conv2d(hidden_size, hidden_size, kernel_size=(1, 2), dilation=(1, self.dilation))
+        self.relu4 = nn.ReLU()
+        # Output layer
+        self.conv_final = nn.Conv2d(hidden_size, 1, kernel_size=(1, 2))
+        self.t = t
+
+    def forward(self, x):
+        """:param x: Pytorch Variable, batch_size x 1 x n_stocks x T
+        :return:"""
+        # First layer
+        out = self.dilated_conv1(x)
+        out = self.relu1(out)
+        # Layer 2:
+        out = self.dilated_conv2(out)
+        out = self.relu2(out)
+        # Layer 3:
+        out = self.dilated_conv3(out)
+        out = self.relu3(out)
+        # Layer 4:
+        out = self.dilated_conv4(out)
+        out = self.relu4(out)
+        # Final layer
+        out = self.conv_final(out)
+        out = out[:, :, :, -1]
+
+        return out
