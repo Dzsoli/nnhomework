@@ -32,14 +32,14 @@ dataset.create_objects()
 # hisize = 10
 # ousize = 1
 lr = 0.005
-num_epochs = 10
+num_epochs = 100
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 data, labels = dataloader(dataset.vehicle_objects, 30, 5)
 data = torch.from_numpy(data).float()
 labels = torch.LongTensor(labels)
-model = SimpleLSTM()
+model = SimpleLSTM(3, 10)
 model = model.to(device)
 # loss = nn.CrossEntropyLoss()
 # loss = nn.MultiLabelSoftMarginLoss()

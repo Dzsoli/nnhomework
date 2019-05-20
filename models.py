@@ -44,20 +44,26 @@ class RNN(nn.Module):
 
 
 class SimpleLSTM(nn.Module):
-    def __init__(self):
+    def __init__(self, input_size, hidden_size):
         super(SimpleLSTM, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
 
         self.rnn = nn.LSTM(
-            input_size=3,
-            hidden_size=3,
+            input_size=input_size,
+            hidden_size=hidden_size,
             num_layers=1,
             batch_first=True,
         )
+        self.softmax = nn.Softmax()
+        self.linear = nn.Linear(self.hidden_size, 3)
 
     def forward(self, x):
-
         out, (h_n, h_c) = self.rnn(x, None)
-        return out[:, -1, :]  # Return output at last time-step
+        inp = out[:, -1, :]  # Return output at last time-step
+        soft = self.linear(inp)
+        out = self.softmax(soft)
+        return out
 
 
 class LSTM(nn.Module):
