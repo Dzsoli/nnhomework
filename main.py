@@ -62,8 +62,17 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         print('epoch: {}, loss: {}'.format(epoch, err))
+print(input_batch[5])
+print(out[5])
+print(input_label[5])
 
+print(input_batch[6])
+print(out[6])
+print(input_label[6])
 
+print(input_batch[7])
+print(out[7])
+print(input_label[7])
 
 
 # print(len(data))
