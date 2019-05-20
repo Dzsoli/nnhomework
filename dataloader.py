@@ -135,19 +135,26 @@ def dataloader(vehicle_objects, window_size, shift):
             batch = []
             for k in range(N):
 
-                features[0] = vehicle.x[lane_change_idx - window_size + 1 - N * shift: lane_change_idx + 1 - N * shift]
-                features[1] = vehicle.v[lane_change_idx - window_size + 1 - N * shift: lane_change_idx + 1 - N * shift]
-                features[2] = vehicle.a[lane_change_idx - window_size + 1 - N * shift: lane_change_idx + 1 - N * shift]
+                features[0] = vehicle.x[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]\
+                              - vehicle.x[lane_change_idx - window_size - k * shift: lane_change_idx - k * shift]
+
+                features[1] = vehicle.v[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]
+                features[2] = vehicle.a[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]
 
                 batch.append(features)
 
-            left_seq.append(batch) if label == -1 else right_seq.append(batch)
+            if label == -1:
+                left_seq.append(batch)
+            else:
+                right_seq.append(batch)
+
         elif lane_change_idx == 0:
             batch = []
             for k in range(N):
-                features[0] = vehicle.x[lane_change_idx + N * shift: lane_change_idx + N * shift + window_size]
-                features[1] = vehicle.v[lane_change_idx + N * shift: lane_change_idx + N * shift + window_size]
-                features[2] = vehicle.a[lane_change_idx + N * shift: lane_change_idx + N * shift + window_size]
+                features[0] = vehicle.x[lane_change_idx + 1 + k * shift: lane_change_idx + 1 + k * shift + window_size] - \
+                              vehicle.x[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
+                features[1] = vehicle.v[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
+                features[2] = vehicle.a[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
 
                 batch.append(features)
 
