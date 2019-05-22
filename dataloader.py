@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import pickle
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class VehicleDataset(Dataset):
     """NGSIM vehicle dataset"""
 
@@ -130,35 +132,35 @@ def dataloader(vehicle_objects, window_size, shift):
     for vehicle in vehicle_objects:
         # print("Vehicle: {}, size: {}".format(vehicle.id, vehicle.size))
         lane_change_idx, label = lane_change_to_idx(vehicle)
-
+        # print('lavel:{}, index:{}'.format(label, lane_change_idx))
         if (lane_change_idx - 1) > 2 * window_size:
-            batch = []
+            batch1 = []
             for k in range(N):
 
-                features[0] = vehicle.x[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]\
-                              - vehicle.x[lane_change_idx - window_size - k * shift: lane_change_idx - k * shift]
+                features[0] = vehicle.x[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]#\
+                              #- vehicle.x[lane_change_idx - window_size - k * shift: lane_change_idx - k * shift]
 
                 features[1] = vehicle.v[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]
                 features[2] = vehicle.a[lane_change_idx - window_size + 1 - k * shift: lane_change_idx + 1 - k * shift]
 
-                batch.append(features)
+                batch1.append(features)
 
             if label == -1:
-                left_seq.append(batch)
+                left_seq.append(batch1)
             else:
-                right_seq.append(batch)
+                right_seq.append(batch1)
 
         elif lane_change_idx == 0:
-            batch = []
+            batch2 = []
             for k in range(N):
-                features[0] = vehicle.x[lane_change_idx + 1 + k * shift: lane_change_idx + 1 + k * shift + window_size] - \
-                              vehicle.x[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
+                features[0] = vehicle.x[lane_change_idx + 1 + k * shift: lane_change_idx + 1 + k * shift + window_size] #- \
+                              #vehicle.x[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
                 features[1] = vehicle.v[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
                 features[2] = vehicle.a[lane_change_idx + k * shift: lane_change_idx + k * shift + window_size]
 
-                batch.append(features)
+                batch2.append(features)
 
-            keep_seq.append(batch)
+            keep_seq.append(batch2)
 
     lab = []
     for i in range(N):
@@ -169,13 +171,181 @@ def dataloader(vehicle_objects, window_size, shift):
         lab.append(keep)
 
     for l, r, k in zip(left_seq, right_seq, keep_seq):
-        batch = np.concatenate((l, r, k), axis=0)
-        data.append(batch)
+        batch3 = np.concatenate((l, r, k), axis=0)
+        data.append(batch3)
         label_sequences.append(lab)
 
     data = np.array(data).transpose((0, 1, 3, 2))
     label_sequences = np.array(label_sequences)
+    # print(left_seq[0:3])
+    # print(right_seq[0:3])
+    # print(keep_seq[0:3])
     return data, label_sequences
+
+
+def dataloader_20(dataset, window_size, shift):
+    vehicle_objects = dataset.vehicle_objects
+    number = 0
+    number_left = 0
+    number_right = 0
+    left_iter = []
+    right_iter = []
+    keep_iter = []
+    features = []
+    data = []
+    N = int(window_size/shift)
+    for idx, vehicle in enumerate(vehicle_objects):
+        lane_change_idx, labels = lane_change_to_idx(vehicle)
+        if lane_change_idx > 3 * window_size:
+            # print(vehicle.id)
+            if labels == 1:
+                number_right += 1
+                right_iter.append(idx)
+            if labels == -1:
+                number_left += 1
+                left_iter.append(idx)
+        if lane_change_idx == 0:
+            keep_iter.append(idx)
+            number += 1
+    # print('numbers: ', number, number_right, number_left)
+    for left, right, keep in zip(left_iter, right_iter, keep_iter):
+        # lane change left
+        lane_change_idx, labels = lane_change_to_idx(vehicle_objects[left])
+        for k in range(N):
+            features.clear()
+            index = lane_change_idx - 2 * window_size + k * shift
+            features.append(vehicle_objects[left].x[index: index + window_size]
+                            - vehicle_objects[left].x[index - 1: index + window_size - 1])
+            features.append(vehicle_objects[left].v[index: index + window_size])
+            features.append(vehicle_objects[left].a[index: index + window_size])
+            data.append(features)
+
+        # lane change right
+        lane_change_idx, labels = lane_change_to_idx(vehicle_objects[right])
+        for k in range(N):
+            features.clear()
+            index = lane_change_idx - 2 * window_size + k * shift
+            features.append(vehicle_objects[right].x[index: index + window_size]
+                            - vehicle_objects[right].x[index - 1: index + window_size - 1])
+            features.append(vehicle_objects[right].v[index: index + window_size])
+            features.append(vehicle_objects[right].a[index: index + window_size])
+            data.append(features)
+
+        # lane keeping
+        _, labels = lane_change_to_idx(vehicle_objects[keep])
+        first_idx = 3 * window_size
+        for k in range(N):
+            features.clear()
+            index = first_idx - 2 * window_size + k * shift
+            features.append(vehicle_objects[keep].x[index: index + window_size]
+                            - vehicle_objects[keep].x[index - 1: index + window_size - 1])
+            features.append(vehicle_objects[keep].v[index: index + window_size])
+            features.append(vehicle_objects[keep].a[index: index + window_size])
+            data.append(features)
+    data = np.array(data).transpose((0, 2, 1))
+    print(data.shape)
+    # label creation
+    leftlab = [1,0,0]
+    keeplab = [0,1,0]
+    rightlab = [0,0,1]
+    lab = []
+    for i in range(number_right):
+        for j in range(N):
+            lab.append(leftlab)
+        for j in range(N):
+            lab.append(rightlab)
+        for j in range(N):
+            lab.append(keeplab)
+
+    label = np.array(lab)
+    # print('shape: ', data.shape, label.shape)
+    print(data[0:4])
+    return data, label
+
+def dataloader_2(dataset, window_size, shift):
+    vehicle_objects = dataset.vehicle_objects
+    number = 0
+    number_left = 0
+    number_right = 0
+    left_iter = []
+    right_iter = []
+    keep_iter = []
+    total_idx = 0
+    features = np.zeros((3, window_size))
+    data = np.zeros((1350, 3, window_size))
+    N = int(window_size/shift)
+    for idx, vehicle in enumerate(vehicle_objects):
+        lane_change_idx, labels = lane_change_to_idx(vehicle)
+        if lane_change_idx > 3 * window_size:
+            # print(vehicle.id)
+            if labels == 1:
+                number_right += 1
+                right_iter.append(idx)
+            if labels == -1:
+                number_left += 1
+                left_iter.append(idx)
+        if lane_change_idx == 0:
+            keep_iter.append(idx)
+            number += 1
+    # print('numbers: ', number, number_right, number_left)
+    for left, right, keep in zip(left_iter, right_iter, keep_iter):
+        # lane change left
+        lane_change_idx, labels = lane_change_to_idx(vehicle_objects[left])
+        for k in range(N):
+            features[0] = 0
+            index = lane_change_idx - 2 * window_size + k * shift + 1
+            features[0] = (vehicle_objects[left].x[index: index + window_size]
+                           - vehicle_objects[left].x[index - 1: index + window_size - 1])
+            features[1] = (vehicle_objects[left].v[index: index + window_size])
+            features[2] = (vehicle_objects[left].a[index: index + window_size])
+            # print(features)
+            data[total_idx] = features
+            total_idx += 1
+        # print("K")
+        # lane change right
+        lane_change_idx, labels = lane_change_to_idx(vehicle_objects[right])
+        for k in range(N):
+            features[0] = 0
+            index = lane_change_idx - 2 * window_size + k * shift + 1
+            features[0] = (vehicle_objects[right].x[index: index + window_size]
+                            - vehicle_objects[right].x[index - 1: index + window_size - 1])
+            features[1] = (vehicle_objects[right].v[index: index + window_size])
+            features[2] = (vehicle_objects[right].a[index: index + window_size])
+            data[total_idx] = features
+            total_idx += 1
+        # lane keeping
+        _, labels = lane_change_to_idx(vehicle_objects[keep])
+        first_idx = 3 * window_size
+        for k in range(N):
+            features[0] = 0
+            index = first_idx - 2 * window_size + k * shift + 1
+            features[0] = (vehicle_objects[keep].x[index: index + window_size]
+                            - vehicle_objects[keep].x[index - 1: index + window_size - 1])
+            features[1] = (vehicle_objects[keep].v[index: index + window_size])
+            features[2] = (vehicle_objects[keep].a[index: index + window_size])
+            data[total_idx] = features
+            total_idx += 1
+
+    # print("data shape", data.shape)
+    # print(data[0:20])
+    # data = np.array(data)
+    data = data.transpose((0, 2, 1))
+    # label creation
+    leftlab = [1, 0, 0]
+    keeplab = [0, 1, 0]
+    rightlab = [0, 0, 1]
+    lab = []
+    for i in range(number_right):
+        for j in range(N):
+            lab.append(leftlab)
+        for j in range(N):
+            lab.append(rightlab)
+        for j in range(N):
+            lab.append(keeplab)
+
+    label = np.array(lab)
+    # print('shape: ', data.shape, label.shape)ű
+    return data, label
 
 
 def lane_change_to_idx(vehicle):
@@ -192,3 +362,31 @@ def lane_change_to_idx(vehicle):
         j = j + 1
 
     return lane_change_idx, labels
+
+def testing(model, data, labels):
+    print('Testing the network...')
+    model.eval()
+    model.to(device)
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inp, labs in d_loader:
+            inp, labs = inp.to('cuda'), labs.to('cuda')
+            outputs = model(inp)
+            _, prediction = torch.max(outputs.data, 1)
+            total += labs.size(0)
+
+            out_idx = torch.argmax(outputs, 1)
+            lab_idx = torch.argmax(labs, 1)
+
+            print(outputs)
+            print(labs)
+            # print(out_idx)
+            # print(lab_idx)
+            for k in range(len(out_idx)):
+                total = total + 1
+                if out_idx[k] == lab_idx[k]:
+                    correct = correct + 1
+
+        print('Accuracy on the test set: %d %%' % (100 * correct / total))

@@ -65,6 +65,41 @@ class SimpleLSTM(nn.Module):
         out = self.softmax(soft)
         return out
 
+class LSTM2(nn.Module):
+    def __init__(self, input_dims, sequence_length, cell_size, output_features=3):
+        super(LSTM2, self).__init__()
+        self.input_dims = input_dims
+        self.sequence_length = sequence_length
+        self.cell_size = cell_size
+        self.lstm = nn.LSTMCell(input_dims, cell_size)
+        self.mlp = nn.Sequential(
+            nn.Linear(cell_size, cell_size),
+            nn.ReLU(),
+            nn.Linear(cell_size, cell_size)
+        )
+        self.to_output = nn.Linear(cell_size, output_features)
+
+    def forward(self, input):
+
+        h_t, c_t = self.init_hidden(input.size(0))
+
+        outputs = []
+        print(input.size())
+        print(input[0])
+        print(input[1])
+
+
+        for input_t in torch.chunk(input, self.sequence_length, dim=2):
+            h_t, c_t = self.lstm(input_t.squeeze(2), (h_t, c_t))
+            h_t = self.mlp(h_t)
+            outputs.append(self.to_output(h_t))
+
+        return self.to_output(h_t)  # torch.cat(outputs, dim=1)
+
+    def init_hidden(self, batch_size):
+        hidden = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
+        cell = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
+        return hidden.zero_(), cell.zero_()
 
 class LSTM(nn.Module):
 
