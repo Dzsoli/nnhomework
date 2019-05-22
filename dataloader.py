@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
 import pickle
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -363,30 +364,33 @@ def lane_change_to_idx(vehicle):
 
     return lane_change_idx, labels
 
-def testing(model, data, labels):
-    print('Testing the network...')
+
+def testing(model, data, labels, loss=nn.MSELoss()):
+    # print('Testing the network...')
     model.eval()
     model.to(device)
     correct = 0
     total = 0
 
     with torch.no_grad():
-        for inp, labs in d_loader:
-            inp, labs = inp.to('cuda'), labs.to('cuda')
-            outputs = model(inp)
-            _, prediction = torch.max(outputs.data, 1)
-            total += labs.size(0)
 
-            out_idx = torch.argmax(outputs, 1)
-            lab_idx = torch.argmax(labs, 1)
+        outputs = model(data)
+        _, prediction = torch.max(outputs.data, 1)
+        # total += labels.size(0)
+        # print(total)
+        out_idx = torch.argmax(outputs, 1)
+        lab_idx = torch.argmax(labels, 1)
 
-            print(outputs)
-            print(labs)
-            # print(out_idx)
-            # print(lab_idx)
-            for k in range(len(out_idx)):
-                total = total + 1
-                if out_idx[k] == lab_idx[k]:
-                    correct = correct + 1
+        # print(outputs)
+        # print(labels)
+        # print(out_idx)
+        # print(lab_idx)
+        for k in range(len(out_idx)):
+            total = total + 1
+            if out_idx[k] == lab_idx[k]:
+                correct = correct + 1
+        err = loss(outputs, labels)
+    # print('Accuracy on the test set: %d %%' % (100 * correct / total))
+    # print('Test loss:{}'.format(err))
 
-        print('Accuracy on the test set: %d %%' % (100 * correct / total))
+    return correct/total, err

@@ -83,16 +83,16 @@ class LSTM2(nn.Module):
 
         h_t, c_t = self.init_hidden(input.size(0))
 
-        outputs = []
+        outputs = torch.zeroes
         print(input.size())
         print(input[0])
         print(input[1])
 
-
-        for input_t in torch.chunk(input, self.sequence_length, dim=2):
-            h_t, c_t = self.lstm(input_t.squeeze(2), (h_t, c_t))
-            h_t = self.mlp(h_t)
-            outputs.append(self.to_output(h_t))
+        for input_seq in input:
+            for frame in input_seq:
+                h_t, c_t = self.lstm(frame, (h_t, c_t))
+                h_t = self.mlp(h_t)
+                # outputs.append(self.to_output(h_t))
 
         return self.to_output(h_t)  # torch.cat(outputs, dim=1)
 
