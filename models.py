@@ -65,6 +65,7 @@ class SimpleLSTM(nn.Module):
         out = self.softmax(soft)
         return out
 
+
 class LSTM2(nn.Module):
     def __init__(self, input_dims, sequence_length, cell_size, output_features=3):
         super(LSTM2, self).__init__()
@@ -101,6 +102,7 @@ class LSTM2(nn.Module):
         cell = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
         return hidden.zero_(), cell.zero_()
 
+
 class LSTM(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, batch_size=1, output_dim=3,
@@ -133,3 +135,44 @@ class LSTM(nn.Module):
         # Can pass on the entirety of lstm_out to the next layer if it is a seq2seq prediction
         y_pred = lstm_out[-1].view(self.batch_size, -1)
         return y_pred.view(-1)
+
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels=3, out_channels=16, kernel_size=5, stride=1, padding=2),
+            # nn.InstanceNorm1d(16),
+            nn.PReLU(16),
+            nn.Conv1d(in_channels=16, out_channels=64, kernel_size=7, stride=1, padding=3),
+            # nn.InstanceNorm1d(64),
+            nn.PReLU(64),
+            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=9, stride=1, padding=4),
+            # nn.InstanceNorm1d(128),
+            nn.PReLU(128),
+            nn.AvgPool1d(kernel_size=3)
+        )
+        # self.conv2 = nn.Sequential(
+        #     nn.Conv1d(in_channels=16, out_channels=64, kernel_size=3, stride=1, padding=1),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=2),
+        # )
+        # self.conv3 = nn.Sequential(
+        #     nn.Conv1d(in_channels=64, out_channels=265, kernel_size=5, stride=1, padding=2),
+        #     nn.ReLU(),
+        #     nn.MaxPool1d(kernel_size=2),
+        # )
+        self.drop_out = nn.Dropout()
+        self.fc1 = nn.Linear(1280, 560)  # output 3 classes: ...
+        self.fc2 = nn.Linear(560, 3)
+        self.soft = nn.Softmax()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        # x = self.conv2(x)
+        # x = self.conv3(x)
+        x = self.drop_out(x)
+        output = self.fc1(x.view(x.size()[0], -1))
+        output = self.fc2(output)
+        output = self.soft(output)
+        return output

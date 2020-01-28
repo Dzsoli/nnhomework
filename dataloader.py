@@ -17,7 +17,7 @@ class VehicleDataset(Dataset):
         """
         asd
         """
-        self.all_data = np.array(pd.read_csv(csv_file, delimiter=',', header=None))
+        self.all_data = np.array(pd.read_csv(csv_file, delimiter=',', header=0))
         self.root_dir = root_dir
         self.transform = transform
         self.vehicle_objects = None
@@ -31,6 +31,7 @@ class VehicleDataset(Dataset):
         return self.vehicle_objects[idx]
 
     def create_objects(self):
+        # i = 0 if header is none
         i = 0
         vehicle_objects = []
         while len(self.all_data) > i:
@@ -263,6 +264,7 @@ def dataloader_20(dataset, window_size, shift):
     print(data[0:4])
     return data, label
 
+
 def dataloader_2(dataset, window_size, shift):
     vehicle_objects = dataset.vehicle_objects
     number = 0
@@ -289,6 +291,8 @@ def dataloader_2(dataset, window_size, shift):
             keep_iter.append(idx)
             number += 1
     # print('numbers: ', number, number_right, number_left)
+    samples = np.min([len(right_iter), len(left_iter), len(keep_iter)])
+    data = np.zeros((samples * 3 * N, 3, window_size))
     for left, right, keep in zip(left_iter, right_iter, keep_iter):
         # lane change left
         lane_change_idx, labels = lane_change_to_idx(vehicle_objects[left])
@@ -319,7 +323,7 @@ def dataloader_2(dataset, window_size, shift):
         first_idx = 3 * window_size
         for k in range(N):
             features[0] = 0
-            index = first_idx - 2 * window_size + k * shift + 1
+            index = 2 * window_size + k * shift + 1 # 2 windows size volt
             features[0] = (vehicle_objects[keep].x[index: index + window_size]
                             - vehicle_objects[keep].x[index - 1: index + window_size - 1])
             features[1] = (vehicle_objects[keep].v[index: index + window_size])
@@ -330,7 +334,10 @@ def dataloader_2(dataset, window_size, shift):
     # print("data shape", data.shape)
     # print(data[0:20])
     # data = np.array(data)
-    data = data.transpose((0, 2, 1))
+
+    # lstm-hez kell a transzponálás
+    # data = data.transpose((0, 2, 1))
+
     # label creation
     leftlab = [1, 0, 0]
     keeplab = [0, 1, 0]
@@ -394,3 +401,41 @@ def testing(model, data, labels, loss=nn.MSELoss()):
     # print('Test loss:{}'.format(err))
 
     return correct/total, err
+
+
+def testing2(model, d_loader, loss_fn):
+    # print('Testing the network...')
+    # loss_fn = nn.MSELoss()
+    model.eval()
+    model.to('cuda')
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inp, labs in d_loader:
+            inp, labs = inp.to('cuda'), labs.to('cuda')
+            outputs = model(inp)
+            # _, prediction = torch.max(outputs.data, 1)
+            # total += labs.size(0)
+
+            out_idx = torch.argmax(outputs, 1)
+            lab_idx = torch.argmax(labs, 1)
+
+            loss = loss_fn(outputs, labs)
+            # print(outputs)
+            # print(labs)
+            # print(out_idx)
+            # print(lab_idx)
+            for k in range(len(out_idx)):
+                total = total + 1
+                if out_idx[k] == lab_idx[k]:
+                    correct = correct + 1
+
+        # print('Accuracy %d %', (100 * correct / total))
+
+        return correct / total, loss
+
+
+def CELoss(output, target):
+    loss = nn.CrossEntropyLoss()
+    return loss(output[:, 0], target[:, 0]) + loss(output[:, 1], target[:, 1]) + loss(output[:, 2], target[:, 2])

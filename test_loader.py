@@ -15,6 +15,8 @@ import torch.nn as nn
 from dataloader import *
 from models import *
 csv_name = "../si_data.csv"
+full_sorted_data_csv = "../full_data/full_data_sorted_loc.csv"
+clean_data_csv = "../full_data/clean_data.csv"
 
 lr = 0.001
 num_epochs = 3000
@@ -22,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 dataset = VehicleDataset(csv_name)
 dataset.create_objects()
-data, labels = dataloader_2(dataset, 30, 5)
+data, labels = dataloader_2(dataset, 20, 3)
 # quotient for chopping the data
 q = 0.15
 
@@ -45,7 +47,8 @@ valid_labels = torch.LongTensor(valid_labels).to(device=device, dtype=torch.floa
 
 model = SimpleLSTM(3, 10)
 model = model.to(device)
-loss = nn.MSELoss()
+# loss = nn.MSELoss()
+loss = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 # optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.05)
 train_error = []
@@ -58,11 +61,16 @@ for epoch in range(num_epochs):
     optimizer.zero_grad()
     out = model(train_data)
     err = loss(out, train_labels)
+    # print(out.shape, train_labels.shape)
+    # err = CELoss(out, train_labels)
+    # print(err)
+
+
     # if epoch % 50 == 0:
     #     print('out: {}'.format(out[10]), 'label: {}'.format(train_labels[10]), 'product: {}'.format(out[10] * train_labels[10]))
     err.backward()
     optimizer.step()
-    acc, valid_err = testing(model, valid_data, valid_labels)
+    acc, valid_err = testing(model, valid_data, valid_labels, loss=loss)
     train_error.append(err)
     valid_error.append(valid_err)
     # print('epoch: {}, train loss: {}'.format(epoch, err))
